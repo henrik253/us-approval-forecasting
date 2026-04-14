@@ -9,11 +9,14 @@ phases:
   build:
     commands:
       - echo "Zipping deployment package..."
-      - cd pipelines/lambda/lib && zip -r9 ../deployment_package.zip .
-      - cd pipelines/lambda && zip -g deployment_package.zip handler.py
-      - cd pipelines/lambda && zip -gr deployment_package.zip fetch_sources/
+      # Anchor to the root directory for every command
+      - cd $CODEBUILD_SRC_DIR/pipelines/lambda/lib && zip -r9 ../deployment_package.zip .
+      - cd $CODEBUILD_SRC_DIR/pipelines/lambda && zip -g deployment_package.zip handler.py
+      - cd $CODEBUILD_SRC_DIR/pipelines/lambda && zip -gr deployment_package.zip fetch_sources/
   post_build:
     commands:
       - echo "Updating Lambda Function..."
+      # Anchor to root before running the AWS CLI command
+      - cd $CODEBUILD_SRC_DIR
       - aws lambda update-function-code --function-name hf-approval-forecasting-lambda --zip-file fileb://pipelines/lambda/deployment_package.zip
       - echo "DONE!!"
