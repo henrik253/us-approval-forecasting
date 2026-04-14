@@ -176,9 +176,4 @@ def lambda_handler(event: dict, context) -> dict:
     if errors:
         logger.warning("Completed with errors in sources: %s", list(errors.keys()))
 
-    return {
-        "statusCode": 200,
-        "data":       data,
-        "s3":         uploaded,
-        "errors":     errors,
-    }
+ 
