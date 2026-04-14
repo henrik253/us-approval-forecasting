@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def handler(event: dict, context) -> dict:
+def lambda_handler(event: dict, context) -> dict:
     """
     Lambda entry point.
 
@@ -44,13 +44,15 @@ def handler(event: dict, context) -> dict:
           ``data``       : dict of source name → list of records (JSON-serialisable)
           ``errors``     : dict of source name → error message for any failed fetch
     """
+    print('FETCHING: ')
+
     event = event or {}
     start_date = event.get("start_date") or os.getenv("START_DATE")
     end_date   = event.get("end_date")   or os.getenv("END_DATE")
 
     data   = {}
     errors = {}
-
+    print('     FETCHING FRED DATA')
     # ── FRED economic data ────────────────────────────────────────────────────
     try:
         fred_api_key = os.getenv("FRED_API_KEY", "")
@@ -66,6 +68,7 @@ def handler(event: dict, context) -> dict:
         logger.error("FRED fetch failed: %s", e)
         errors["economic"] = str(e)
 
+    print('     FETCHING VOTEHUB DATA')
     # ── VoteHub approval polls ────────────────────────────────────────────────
     try:
         polls = VoteHubFetcher().fetch()
@@ -77,6 +80,7 @@ def handler(event: dict, context) -> dict:
         logger.error("VoteHub fetch failed: %s", e)
         errors["approval"] = str(e)
 
+    print('     FETCHING GDELT DATA')
     # ── GDELT media sentiment ─────────────────────────────────────────────────
     try:
         cache_dir = os.getenv("GDELT_CACHE_DIR", "/tmp/gdelt")

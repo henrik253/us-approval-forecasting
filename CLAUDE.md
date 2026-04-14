@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Forecasting US approvals (US President) using a data warehousing pipeline and machine learning models. Master's-level Data Warehousing project.
 
+## Workflow
+
+- Every query should be appended to the query.mb file 
+
 ## Architecture
 
 The project follows the **Medallion architecture** for data processing, combined with a separate ML layer:
