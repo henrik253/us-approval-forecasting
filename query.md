@@ -2,6 +2,42 @@
 
 ---
 
+## Q13 — 2026-04-14
+
+Add all missed queries from today to query.md.
+
+---
+
+## Q12 — 2026-04-14
+
+Commit and push handler.py and requirements.txt changes (debug mode + S3 upload).
+
+---
+
+## Q11 — 2026-04-14
+
+Add debug mode to pipelines/lambda/handler.py: read a debug key from the event dict (true/false), skip real fetches when true and use hardcoded dummy data instead. Store data (debug or real) to S3 as JSON. All S3 config (bucket name, key prefix, region) must come from environment variables.
+
+---
+
+## Q10 — 2026-04-14
+
+Commit the buildspec.yml bugfix that anchors cd commands with $CODEBUILD_SRC_DIR.
+
+---
+
+## Q9 — 2026-04-14
+
+Commit and push the buildspec.yml changes.
+
+---
+
+## Q8 — 2026-04-14
+
+Edit pipelines/lambda/buildspec.yml for the current folder structure: fix Python version (3.14 → 3.12), correct requirements.txt and lib paths relative to repo root, replace lambda_function.py with handler.py, and include the fetch_sources/ package in the deployment zip.
+
+---
+
 ## Q7 — 2026-04-13
 
 Restructure repo: create pipelines/lambda/ with handler.py and requirements.txt; split data_loader.py and data_utils.py into pipelines/lambda/fetch_sources/fred.py, gdelt.py, votehub.py with per-source error handling. Remove old src/data_loader.py and src/data_utils.py. Update analysis.ipynb imports.

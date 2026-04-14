@@ -8,7 +8,7 @@ Forecasting US approvals (US President) using a data warehousing pipeline and ma
 
 ## Workflow
 
-- Every query should be appended to the query.mb file 
+- After EVERY user request, append the query to query.md before finishing the response.
 
 ## Architecture
 
