@@ -2,6 +2,12 @@
 
 ---
 
+## Q14 — 2026-04-14
+
+Rewrite fetch_sources/fred.py, gdelt.py, votehub.py and handler.py to remove pandas entirely. All fetchers now return plain lists of dicts. GDELT drops rolling-mean smoothing. FRED fetch_panel returns a flat list with a series key instead of a wide DataFrame. Remove pandas from requirements.txt (boto3 stays out too since it is pre-installed on the Lambda runtime).
+
+---
+
 ## Q13 — 2026-04-14
 
 Add all missed queries from today to query.md.

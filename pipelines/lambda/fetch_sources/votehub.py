@@ -1,6 +1,6 @@
 import logging
+from typing import List
 
-import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ class VoteHubFetcher:
     Fetches presidential approval poll data from the VoteHub API.
 
     Filters by date range and minimum sample size to exclude low-quality polls.
-    Returns an empty DataFrame (never raises) so callers can handle missing data
+    Returns an empty list (never raises) so callers can handle missing data
     gracefully.
     """
 
@@ -45,13 +45,13 @@ class VoteHubFetcher:
         self.to_date         = to_date
         self.min_sample_size = min_sample_size
 
-    def fetch(self) -> pd.DataFrame:
+    def fetch(self) -> List[dict]:
         """
         Fetch approval polls filtered by the instance's date range and sample size.
 
         Returns:
-            DataFrame with columns: date, sample_size, approval, disapproval.
-            Empty DataFrame on any failure.
+            List of ``{"date": str, "sample_size": int, "approval": float,
+            "disapproval": float}`` records, sorted by date. Empty list on failure.
         """
         try:
             r = requests.get(
@@ -62,7 +62,7 @@ class VoteHubFetcher:
             )
             if r.status_code != 200:
                 logger.error("VoteHub returned HTTP %d", r.status_code)
-                return pd.DataFrame()
+                return []
 
             records = []
             for poll in r.json():
@@ -70,7 +70,7 @@ class VoteHubFetcher:
                 sample_size = poll.get("sample_size", 0) or 0
                 if not end_date or end_date < self.from_date or sample_size < self.min_sample_size:
                     continue
-                record = {"date": pd.to_datetime(end_date), "sample_size": sample_size}
+                record: dict = {"date": end_date, "sample_size": sample_size}
                 for answer in poll.get("answers", []):
                     if answer.get("choice") == "Approve":
                         record["approval"] = answer.get("pct")
@@ -80,13 +80,16 @@ class VoteHubFetcher:
                     records.append(record)
 
             if not records:
-                logger.warning("VoteHub: no polls matched the filters (from=%s, min_n=%d)", self.from_date, self.min_sample_size)
-                return pd.DataFrame()
+                logger.warning(
+                    "VoteHub: no polls matched the filters (from=%s, min_n=%d)",
+                    self.from_date, self.min_sample_size,
+                )
+                return []
 
-            return pd.DataFrame(records).sort_values("date").reset_index(drop=True)
+            return sorted(records, key=lambda rec: rec["date"])
 
         except requests.exceptions.RequestException as e:
             logger.error("VoteHub request failed: %s", e)
         except Exception as e:
             logger.error("VoteHub unexpected error: %s", e)
-        return pd.DataFrame()
+        return []

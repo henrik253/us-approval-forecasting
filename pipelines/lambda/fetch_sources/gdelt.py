@@ -3,9 +3,8 @@ import logging
 import pickle
 import time
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
-import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
@@ -91,18 +90,17 @@ class GDELTFetcher:
         self,
         start: str = "20250101000000",
         end: str = "20260328000000",
-        rolling_window: int = 20,
-    ) -> pd.DataFrame:
+    ) -> List[dict]:
         """
         Fetch tone and volume timelines for the configured query.
 
         Args:
-            start:          Start datetime in GDELT format (YYYYMMDDHHmmss).
-            end:            End datetime in GDELT format (YYYYMMDDHHmmss).
-            rolling_window: Periods for centred rolling mean applied to both series.
+            start: Start datetime in GDELT format (YYYYMMDDHHmmss).
+            end:   End datetime in GDELT format (YYYYMMDDHHmmss).
 
         Returns:
-            DataFrame with columns: date, tone, volume. Empty DataFrame on failure.
+            List of ``{"date": str, "tone": float, "volume": float}`` records,
+            sorted by date. Empty list on failure.
         """
         try:
             tone_data = self._fetch_mode("TimelineTone", start, end)
@@ -114,26 +112,25 @@ class GDELTFetcher:
 
             if not tone_data and not vol_data:
                 logger.warning("GDELT returned no data for query: %s", self.query)
-                return pd.DataFrame()
+                return []
 
-            def _to_df(data, col):
-                return pd.DataFrame(
-                    [{"date": pd.to_datetime(p["date"]), col: float(p["value"])} for p in data]
-                )
+            tone_by_date = {p["date"]: float(p["value"]) for p in tone_data}
+            vol_by_date  = {p["date"]: float(p["value"]) for p in vol_data}
 
-            df = (
-                _to_df(tone_data, "tone")
-                .merge(_to_df(vol_data, "volume"), on="date")
-                .sort_values("date")
-                .reset_index(drop=True)
-            )
-            df["tone"]   = df["tone"].rolling(window=rolling_window, min_periods=1, center=True).mean()
-            df["volume"] = df["volume"].rolling(window=rolling_window, min_periods=1, center=True).mean()
-            return df
+            records = []
+            for date in sorted(set(tone_by_date) | set(vol_by_date)):
+                record: dict = {"date": date}
+                if date in tone_by_date:
+                    record["tone"]   = tone_by_date[date]
+                if date in vol_by_date:
+                    record["volume"] = vol_by_date[date]
+                records.append(record)
+
+            return records
 
         except Exception as e:
             logger.error("GDELT fetch failed: %s", e)
-            return pd.DataFrame()
+            return []
 
     def clear_cache(self) -> None:
         """Remove all cached GDELT responses from disk."""

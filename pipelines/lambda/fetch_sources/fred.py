@@ -1,7 +1,6 @@
 import logging
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
-import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
@@ -11,10 +10,10 @@ class FREDFetcher:
     """
     Fetches economic time-series data from the FRED API (St. Louis Fed).
 
-    All individual series methods return a long-format DataFrame with columns
-    ``date`` and ``value``, or an empty DataFrame when the request fails.
-    ``fetch_panel`` merges everything into a wide monthly DataFrame ready for
-    modelling.
+    All individual series methods return a list of ``{"date": str, "value": float,
+    "indicator": str}`` records, or an empty list when the request fails.
+    ``fetch_panel`` returns a flat list across all series with an added ``series``
+    key, ready for JSON serialisation and S3 storage.
     """
 
     BASE_URL = "https://api.stlouisfed.org/fred"
@@ -77,7 +76,7 @@ class FREDFetcher:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         units: Optional[str] = None,
-    ) -> pd.DataFrame:
+    ) -> List[dict]:
         params: dict = {
             "series_id": series_id,
             "api_key":   self.api_key,
@@ -92,18 +91,22 @@ class FREDFetcher:
             data = r.json()
             if "observations" not in data:
                 logger.warning("FRED: no observations for series %s", series_id)
-                return pd.DataFrame()
-            df = pd.DataFrame(data["observations"])
-            df["date"]  = pd.to_datetime(df["date"])
-            df["value"] = pd.to_numeric(df["value"], errors="coerce")
-            return df[["date", "value"]].dropna()
+                return []
+            records = []
+            for obs in data["observations"]:
+                try:
+                    value = float(obs["value"])
+                except (ValueError, TypeError):
+                    continue
+                records.append({"date": obs["date"], "value": value})
+            return records
         except requests.exceptions.HTTPError as e:
             logger.error("FRED HTTP error for %s: %s", series_id, e)
         except requests.exceptions.RequestException as e:
             logger.error("FRED request failed for %s: %s", series_id, e)
         except Exception as e:
             logger.error("FRED unexpected error for %s: %s", series_id, e)
-        return pd.DataFrame()
+        return []
 
     def _fred(
         self,
@@ -112,29 +115,29 @@ class FREDFetcher:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         units: Optional[str] = None,
-    ) -> pd.DataFrame:
-        df = self._fetch_series(self.SERIES_IDS[key], start_date, end_date, units=units)
-        if not df.empty:
-            df["indicator"] = label
-        return df
+    ) -> List[dict]:
+        records = self._fetch_series(self.SERIES_IDS[key], start_date, end_date, units=units)
+        for r in records:
+            r["indicator"] = label
+        return records
 
     # ── GDP & Macro ───────────────────────────────────────────────────────────
 
-    def get_gdp(self, real: bool = False, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_gdp(self, real: bool = False, start_date=None, end_date=None) -> List[dict]:
         key   = "gdp_real" if real else "gdp"
         label = "Real GDP (Chained 2012 Dollars)" if real else "Nominal GDP (Current Dollars)"
         return self._fred(key, label, start_date, end_date)
 
-    def get_cpi(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> pd.DataFrame:
+    def get_cpi(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> List[dict]:
         return self._fred("cpi", "Consumer Price Index (All Urban Consumers)", start_date, end_date, units)
 
-    def get_unemployment_rate(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_unemployment_rate(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("unemployment", "Unemployment Rate (%)", start_date, end_date)
 
-    def get_federal_funds_rate(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_federal_funds_rate(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("federal_funds_rate", "Effective Federal Funds Rate (%)", start_date, end_date)
 
-    def get_interest_rates(self, rate_type: Optional[str] = "all", start_date=None, end_date=None) -> Dict[str, pd.DataFrame]:
+    def get_interest_rates(self, rate_type: Optional[str] = "all", start_date=None, end_date=None) -> Dict[str, List[dict]]:
         rates = {}
         if rate_type in ("all", "10yr"):
             rates["10yr_treasury"] = self._fred("10yr_treasury", "10-Year Treasury Rate (%)", start_date, end_date)
@@ -144,7 +147,7 @@ class FREDFetcher:
             rates["mortgage_30yr"] = self._fred("mortgage_rate_30yr", "30-Year Mortgage Rate (%)", start_date, end_date)
         return rates
 
-    def get_international_trade(self, trade_type: Optional[str] = "all", start_date=None, end_date=None) -> Dict[str, pd.DataFrame]:
+    def get_international_trade(self, trade_type: Optional[str] = "all", start_date=None, end_date=None) -> Dict[str, List[dict]]:
         trade = {}
         if trade_type in ("all", "exports"):
             trade["exports"] = self._fred("exports",       "Exports (Billions $)",       start_date, end_date)
@@ -154,88 +157,88 @@ class FREDFetcher:
             trade["balance"] = self._fred("trade_balance", "Trade Balance (Billions $)", start_date, end_date)
         return trade
 
-    def get_michigan_sentiment(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_michigan_sentiment(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("michigan_sentiment", "Consumer Sentiment Index", start_date, end_date)
 
     # ── Inflation & Prices ────────────────────────────────────────────────────
 
-    def get_pce_inflation(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> pd.DataFrame:
+    def get_pce_inflation(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> List[dict]:
         return self._fred("pce_inflation", "PCE Price Index", start_date, end_date, units)
 
-    def get_core_cpi(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> pd.DataFrame:
+    def get_core_cpi(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> List[dict]:
         return self._fred("core_cpi", "Core CPI (Ex Food & Energy)", start_date, end_date, units)
 
-    def get_gas_prices(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_gas_prices(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("gas_prices", "Regular Gasoline Price ($/gallon)", start_date, end_date)
 
-    def get_ppi(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> pd.DataFrame:
+    def get_ppi(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> List[dict]:
         return self._fred("ppi", "Producer Price Index (All Commodities)", start_date, end_date, units)
 
     # ── Labor Market ──────────────────────────────────────────────────────────
 
-    def get_labor_participation(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_labor_participation(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("labor_participation", "Labor Force Participation Rate (%)", start_date, end_date)
 
-    def get_u6_unemployment(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_u6_unemployment(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("u6_unemployment", "U-6 Underemployment Rate (%)", start_date, end_date)
 
-    def get_avg_hourly_earnings(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> pd.DataFrame:
+    def get_avg_hourly_earnings(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> List[dict]:
         return self._fred("avg_hourly_earnings", "Average Hourly Earnings (All Employees, $)", start_date, end_date, units)
 
-    def get_jobless_claims(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_jobless_claims(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("jobless_claims", "Initial Jobless Claims (Weekly)", start_date, end_date)
 
-    def get_nonfarm_payrolls(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> pd.DataFrame:
+    def get_nonfarm_payrolls(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> List[dict]:
         return self._fred("nonfarm_payrolls", "Total Nonfarm Payrolls (Thousands)", start_date, end_date, units)
 
     # ── Consumer & Spending ───────────────────────────────────────────────────
 
-    def get_real_disposable_income(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> pd.DataFrame:
+    def get_real_disposable_income(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> List[dict]:
         return self._fred("real_disposable_income", "Real Disposable Personal Income (Billions $)", start_date, end_date, units)
 
-    def get_personal_savings_rate(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_personal_savings_rate(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("personal_savings_rate", "Personal Savings Rate (%)", start_date, end_date)
 
-    def get_retail_sales(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> pd.DataFrame:
+    def get_retail_sales(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> List[dict]:
         return self._fred("retail_sales", "Retail & Food Services Sales (Millions $)", start_date, end_date, units)
 
-    def get_consumer_credit(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> pd.DataFrame:
+    def get_consumer_credit(self, start_date=None, end_date=None, units: Optional[str] = "lin") -> List[dict]:
         return self._fred("consumer_credit", "Total Consumer Credit Outstanding (Billions $)", start_date, end_date, units)
 
     # ── Markets & Financial Conditions ────────────────────────────────────────
 
-    def get_sp500(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_sp500(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("sp500", "S&P 500 Index", start_date, end_date)
 
-    def get_vix(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_vix(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("vix", "CBOE Volatility Index (VIX)", start_date, end_date)
 
-    def get_credit_spread(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_credit_spread(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("credit_spread", "Baa-10yr Treasury Credit Spread (%)", start_date, end_date)
 
     # ── Trade & Manufacturing ─────────────────────────────────────────────────
 
-    def get_trade_deficit_goods(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_trade_deficit_goods(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("trade_deficit_goods", "Goods Trade Balance (Millions $)", start_date, end_date)
 
-    def get_china_imports(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_china_imports(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("china_imports", "U.S. Imports from China (Millions $)", start_date, end_date)
 
-    def get_manufacturing_output(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_manufacturing_output(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("manufacturing_output", "Industrial Production: Manufacturing (Index 2017=100)", start_date, end_date)
 
     # ── Fiscal & Debt ─────────────────────────────────────────────────────────
 
-    def get_federal_debt_pct_gdp(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_federal_debt_pct_gdp(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("federal_debt_pct_gdp", "Federal Debt as % of GDP", start_date, end_date)
 
-    def get_budget_deficit(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def get_budget_deficit(self, start_date=None, end_date=None) -> List[dict]:
         return self._fred("budget_deficit", "Federal Budget Surplus/Deficit (Millions $)", start_date, end_date)
 
     # ── Aggregate fetchers ────────────────────────────────────────────────────
 
-    def fetch_all_series(self, start_date=None, end_date=None) -> Dict[str, pd.DataFrame]:
-        """Fetch all series at their native FRED frequency. Returns a dict of long-format DataFrames."""
+    def fetch_all_series(self, start_date=None, end_date=None) -> Dict[str, List[dict]]:
+        """Fetch all series at their native FRED frequency. Returns a dict of series name → list of records."""
         kw = dict(start_date=start_date, end_date=end_date)
         return {
             "gdp_nominal":            self.get_gdp(real=False, **kw),
@@ -269,42 +272,17 @@ class FREDFetcher:
             "budget_deficit":         self.get_budget_deficit(**kw),
         }
 
-    def fetch_panel(self, start_date=None, end_date=None) -> pd.DataFrame:
+    def fetch_panel(self, start_date=None, end_date=None) -> List[dict]:
         """
-        Fetch all series and merge into a wide monthly DataFrame indexed by date.
+        Fetch all series and return as a flat list of records.
 
-        All series are resampled to monthly frequency (end-of-month mean) to align
-        high-frequency series (weekly jobless claims, daily VIX) with lower-frequency
-        ones (quarterly GDP).
-
-        Derived features added:
-          - yield_curve_spread : 10yr Treasury minus 3mo Treasury
-          - real_wage_growth   : avg_hourly_earnings YoY% minus CPI YoY%
-          - misery_index       : unemployment + CPI YoY%
+        Each record contains ``date``, ``value``, ``indicator``, and ``series`` keys.
         """
-        raw = self.fetch_all_series(start_date=start_date, end_date=end_date)
-        frames = {
-            key: df.set_index("date")["value"].resample("ME").mean()
-            for key, df in raw.items()
-            if not df.empty
-        }
-        if not frames:
+        all_series = self.fetch_all_series(start_date=start_date, end_date=end_date)
+        records = []
+        for series_name, series_records in all_series.items():
+            for r in series_records:
+                records.append({**r, "series": series_name})
+        if not records:
             logger.warning("FRED: all series returned empty — check API key and connectivity")
-            return pd.DataFrame()
-
-        wide = pd.DataFrame(frames)
-        wide.index.name = "date"
-
-        if "10yr_treasury" in wide.columns and "3mo_treasury" in wide.columns:
-            wide["yield_curve_spread"] = wide["10yr_treasury"] - wide["3mo_treasury"]
-
-        if "avg_hourly_earnings" in wide.columns and "cpi" in wide.columns:
-            wide["real_wage_growth"] = (
-                wide["avg_hourly_earnings"].pct_change(12) * 100
-                - wide["cpi"].pct_change(12) * 100
-            )
-
-        if "unemployment" in wide.columns and "cpi" in wide.columns:
-            wide["misery_index"] = wide["unemployment"] + wide["cpi"].pct_change(12) * 100
-
-        return wide
+        return records

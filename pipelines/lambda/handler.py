@@ -132,12 +132,11 @@ def lambda_handler(event: dict, context) -> dict:
             fred_api_key = os.getenv("FRED_API_KEY", "")
             if not fred_api_key:
                 raise EnvironmentError("FRED_API_KEY environment variable is not set")
-            fred   = FREDFetcher(api_key=fred_api_key)
-            panel  = fred.fetch_panel(start_date=start_date, end_date=end_date)
-            if panel.empty:
+            records = FREDFetcher(api_key=fred_api_key).fetch_panel(start_date=start_date, end_date=end_date)
+            if not records:
                 raise ValueError("FRED fetch returned an empty panel")
-            data["economic"] = panel.reset_index().to_dict(orient="records")
-            logger.info("FRED: fetched %d rows x %d columns", *panel.shape)
+            data["economic"] = records
+            logger.info("FRED: fetched %d records", len(records))
         except Exception as e:
             logger.error("FRED fetch failed: %s", e)
             errors["economic"] = str(e)
@@ -145,9 +144,9 @@ def lambda_handler(event: dict, context) -> dict:
         print("     FETCHING VOTEHUB DATA")
         try:
             polls = VoteHubFetcher().fetch()
-            if polls.empty:
+            if not polls:
                 raise ValueError("VoteHub fetch returned no records")
-            data["approval"] = polls.to_dict(orient="records")
+            data["approval"] = polls
             logger.info("VoteHub: fetched %d poll records", len(polls))
         except Exception as e:
             logger.error("VoteHub fetch failed: %s", e)
@@ -157,9 +156,9 @@ def lambda_handler(event: dict, context) -> dict:
         try:
             cache_dir = os.getenv("GDELT_CACHE_DIR", "/tmp/gdelt")
             sentiment = GDELTFetcher(cache_dir=cache_dir).fetch()
-            if sentiment.empty:
+            if not sentiment:
                 raise ValueError("GDELT fetch returned no records")
-            data["media_sentiment"] = sentiment.to_dict(orient="records")
+            data["media_sentiment"] = sentiment
             logger.info("GDELT: fetched %d sentiment records", len(sentiment))
         except Exception as e:
             logger.error("GDELT fetch failed: %s", e)
