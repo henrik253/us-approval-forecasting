@@ -2,6 +2,48 @@
 
 ---
 
+## Q21 — 2026-04-22
+
+Update the Lambda requirements.txt.
+
+---
+
+## Q20 — 2026-04-22
+
+Change the AWS Lambda handler so that end_date is always capped to today's actual date — never a future date.
+
+---
+
+## Q19 — 2026-04-22
+
+Operate on the Streamlit app to reflect notebook changes: include disapproval prediction alongside approval, remove train/test split visualization, show predictions and feature importances only. In the forecasting notebook, change APPROVAL_RAW and DISAPPROVAL_RAW to APPROVAL_7D_SMA and DISAPPROVAL_7D_SMA as prediction targets.
+
+---
+
+## Q18 — 2026-04-22
+
+Make another table that stores the cutoff day. Also write both models' feature importances back to a SQL table.
+
+---
+
+## Q17 — 2026-04-22
+
+Operate on the notebook models/forecast_03 and create a second prediction model for the disapproval rating. Also make sure that this data is written to the sql tables as well, as you can see in the last cell.
+
+---
+
+## Q16 — 2026-04-17
+
+Add a notebook cell (after data loading) that gives a schema overview of each JSON file — column names, Python type, inferred SQL type, nullable flag, and an example value — plus a suggested CREATE TABLE DDL, to assist with SQL table design.
+
+---
+
+## Q15 — 2026-04-17
+
+Update analysis.ipynb to use JSON-based caching: create src/resources/, check on each run if today's JSON already exists (per-source files named {source}_{YYYY-MM-DD}.json); if so load from disk, otherwise fetch via the fetchers and save. Convert each raw JSON list to a DataFrame — FRED pivoted to wide format (date index × series columns), polls and sentiment as long DataFrames.
+
+---
+
 ## Q14 — 2026-04-14
 
 Rewrite fetch_sources/fred.py, gdelt.py, votehub.py and handler.py to remove pandas entirely. All fetchers now return plain lists of dicts. GDELT drops rolling-mean smoothing. FRED fetch_panel returns a flat list with a series key instead of a wide DataFrame. Remove pandas from requirements.txt (boto3 stays out too since it is pre-installed on the Lambda runtime).

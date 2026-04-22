@@ -19,6 +19,7 @@ S3_REGION      : Optional. AWS region for the S3 client (default: "us-east-1").
 import json
 import logging
 import os
+from datetime import date
 
 import boto3
 from dotenv import load_dotenv
@@ -102,7 +103,8 @@ def lambda_handler(event: dict, context) -> dict:
     event = event or {}
     debug      = bool(event.get("debug", False))
     start_date = event.get("start_date") or os.getenv("START_DATE")
-    end_date   = event.get("end_date")   or os.getenv("END_DATE")
+    today      = date.today().isoformat()
+    end_date   = min(event.get("end_date") or os.getenv("END_DATE") or today, today)
 
     data   = {}
     errors = {}
