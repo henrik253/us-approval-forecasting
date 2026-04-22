@@ -30,7 +30,7 @@ class VoteHubFetcher:
         self,
         subject: str = "Trump",
         from_date: str = "2025-02-01",
-        to_date: str = "2026-03-20",
+        to_date: str = "2026-04-22",
         min_sample_size: int = 500,
     ):
         """
