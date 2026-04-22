@@ -2,6 +2,12 @@
 
 ---
 
+## Q24 — 2026-04-22
+
+Add a proper README describing the project, including a screenshot from screenshots/.
+
+---
+
 ## Q23 — 2026-04-22
 
 Write a dataset_description.md summarizing all data sources used in the project.
