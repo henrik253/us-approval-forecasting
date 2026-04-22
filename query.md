@@ -2,6 +2,18 @@
 
 ---
 
+## Q23 — 2026-04-22
+
+Write a dataset_description.md summarizing all data sources used in the project.
+
+---
+
+## Q22 — 2026-04-22
+
+When executing the Lambda handler, will it overwrite existing files in the S3 bucket?
+
+---
+
 ## Q21 — 2026-04-22
 
 Update the Lambda requirements.txt.
